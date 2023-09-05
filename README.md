@@ -2,9 +2,10 @@
 
 Movie recommender system created in R/shiny.
 
-This app uses the small [MovieLens dataset](https://grouplens.org/datasets/movielens/) (100 000 entries).
+This app uses the small [MovieLens dataset](https://grouplens.org/datasets/movielens/) (100 000 entries).\
+\
 
-Breakdwon of the application:
+**Breakdown of the application**
 
 User chooses a movie genre of interest.
 
@@ -18,13 +19,15 @@ User then has a choice of four recommender methods:
 
 -   nmf: based on Nonnegative Matrix Factorization algorithm
 
--   cluster: based on k-nearest neighbors clustering
+-   cluster: based on k-nearest neighbors clustering\
 
-Knwon issues:
+**\
+Known issues**
 
--   App freezes and crashes after submitting.
+-   App freezes and crashes after submitting.\
 
-Things to improve/implement:
+**\
+Things to improve/implement**
 
 -   random choice should not require user ratings
 
