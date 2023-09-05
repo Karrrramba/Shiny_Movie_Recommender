@@ -1,0 +1,5 @@
+library(tidyverse)
+library(shiny)
+library(proxy)
+library(NMF)
+library(wordcloud2)
