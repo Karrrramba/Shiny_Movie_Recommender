@@ -2,10 +2,10 @@
 
 Movie recommender system created in R/shiny.
 
-This app uses the small [MovieLens dataset](https://grouplens.org/datasets/movielens/) (100 000 entries).\
-\
+This app uses the small [MovieLens dataset](https://grouplens.org/datasets/movielens/) (100 000 entries).
 
-**Breakdown of the application**
+**\
+Breakdown of the application**
 
 User chooses a movie genre of interest.
 
