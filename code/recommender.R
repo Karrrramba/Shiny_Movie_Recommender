@@ -1,4 +1,4 @@
-# cuser interface ----
+# user interface ----
 ui <- fluidPage(
   # select a movie genre
   selectInput("genre", "Select a movie genre", choices = genre_list), 
@@ -8,7 +8,7 @@ ui <- fluidPage(
     uiOutput("rating_ui"),
     #  allow user to select recommender method
     selectInput("method", "Select a recommendation method", 
-                choices = c("nmf", "random", "vector", "cluster")),
+                choices = c("NMF", "Random", "Vector", "kNN")),
     actionButton("submit_recommendations", "Get recommendations"),
     # display movie recommendations
     tableOutput("recommendations")
@@ -52,8 +52,10 @@ server <- function(input, output, session) {
   })
   # generate recommendations after user prompt
   observeEvent(input$submit_recommendations, {
-    # store user input 
-    input_data <- sapply(names(input), function(i) input[[i]])
+    
+    genre_selected <- input$genre
+    # store user input but exlude genre, recommendation method and buttons
+    input_data <- sapply(names(input)[-c(1, 3, 4)], function(i) input[[i]])
     
     # retrieve the movies and 
     user_rated_movies <- movie_ref_table %>%
@@ -76,15 +78,15 @@ server <- function(input, output, session) {
     
     # merge tables to attach movieID for recommender algorithms
     user_ratings <- user_ratings %>% 
-      left_join(user_rated_movies, by = title)
+      left_join(user_rated_movies, by = "title")
     
     # create empty vector for recommendations
-    recommendations <- NULL
+    recommended_movies <- NULL
     
     # conditional recommendations ----
     
     # NMF-based recommendation ----
-    if(input$method == "nmf") {
+    if(input$method == "NMF") {
       # create empty vector for new user (NMF does not accept NAs)
       new_user_ratings <- rep(0, ncol(rating_matrix))
       new_user_ratings[user_rated_movies$movieId] <- user_rated_movies$rating
@@ -118,21 +120,21 @@ server <- function(input, output, session) {
       # retrieve movie title from reference table
       recommended_movies <- movie_ref_table %>% 
         filter(movieId %in% recommended_movie_ids) %>% 
-        select(title)
+        pull(title)
       
       
     # Random recommendation
-    } else if(input$method == "random") {
+    } else if(input$method == "Random") {
       recommendations <- sample(colnames(rating_matrix), 5)
       
     # Cosine Similarity-based recommendation
-    } else if(input$method == "vector") {
+    } else if(input$method == "Vector") {
       sim <- sim2(as.matrix(rating_matrix), method = "cosine")
       estimated_rating <- as.matrix(user_vector) %*% sim
       recommendations <- names(sort(estimated_rating, decreasing = TRUE))[1:5]
       
     # kNN -based recommendations
-    } else if(input$method == "cluster") {
+    } else if(input$method == "kNN") {
       sim <- sim2(as.matrix(rating_matrix), method = "euclidean")
       nn <- knn(sim, k = 5)
       estimated_rating <- rowMeans(as.matrix(nn), na.rm = TRUE)
@@ -140,7 +142,7 @@ server <- function(input, output, session) {
     }
     
     output$recommendations <- renderTable({
-      data.frame(Recommended_Movies = recommendations)
+      data.frame(recommendations = recommended_movies)
     })
   })
 }
