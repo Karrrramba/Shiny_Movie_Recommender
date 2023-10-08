@@ -107,6 +107,11 @@ server <- function(input, output, session) {
       # predict movie ratings by the user
       new_user_predicted_ratings <- new_user_features %*% H 
       
+      # Remove already-rated movies from recommendations
+      rated_movie_indices <- which(!is.na(new_user_ratings))
+      # assign 0 value so these movies will be on the bottom of the sorted list(next step)
+      new_user_predicted_ratings[rated_movie_indices] <- 0
+      
       # select top5-rated movie ids as predicted
       recommended_movie_ids <- order(new_user_predicted_ratings, decreasing = TRUE)[1:5]
       
