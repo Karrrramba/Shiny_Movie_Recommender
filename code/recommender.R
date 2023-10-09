@@ -37,7 +37,9 @@ server <- function(input, output, session) {
       popular_movies_to_rate <- movie_ref_table %>%
         # filter the respective genre-column based on input
         filter(.data[[genre_selected]] == 1) %>% 
-        arrange(desc(rating)) %>% 
+        # sort based on ratings
+        arrange(desc(rating)) %>%
+        # extract top 10 movies
         head(10) %>%
         pull(title)
         
@@ -54,8 +56,10 @@ server <- function(input, output, session) {
   observeEvent(input$submit_recommendations, {
     
     genre_selected <- input$genre
-    # store user input but exlude genre, recommendation method and buttons
-    input_data <- sapply(names(input)[-c(1, 3, 4)], function(i) input[[i]])
+    # store user input but exclude genre, recommendation method and buttons
+    input_data <- sapply(names(input)[-c(11:14)], function(i) input[[i]])
+    
+    print(input_data)
     
     # retrieve the movies and 
     user_rated_movies <- movie_ref_table %>%
@@ -63,12 +67,20 @@ server <- function(input, output, session) {
       filter(.data[[genre_selected]] == 1) %>% 
       arrange(desc(rating)) %>% 
       head(10) %>% 
-      select(movieId, title)
+      select(movieId, title) %>% 
+      # create rating column and fill with 0
+      mutate(rating = rep(0))
+    
+    user_rated_movies_transposed <- user_rated_movies %>%
+      select(!title) %>% 
+      pivot_wider(names_from = movieId, values_from = rating) %>% 
+      mutate(userId = 999)
     
     # set default rating to 0
-    user_ratings <- tibble(title = user_rated_movies$title, 
-                           rating = 0,
-                           stringsAsFactors = FALSE)
+    user_ratings <- tibble(title = user_rated_movies$title,
+                           rating = 0)
+    
+    print(user_ratings)
     
     # update ratings according to user inputs
     # create a logical mask indicating which of the popular movies the user has rated
@@ -80,6 +92,19 @@ server <- function(input, output, session) {
     user_ratings <- user_ratings %>% 
       left_join(user_rated_movies, by = "title")
     
+    print(user_ratings)
+    
+    # create named vector based on rating matrix with UserId 999
+    new_user_ratings <- setNames(c(999, rep(0, ncol(rating_matrix) -1)), names(rating_matrix))
+    
+    # attach new_user_ratings vector as new row to rating_matrix.
+    rating_matrix_updated <- rbind(rating_matrix, new_user_ratings)
+    
+    # for user-rated movieIDs replace 0s with user ratings
+    rating_matrix_updated[match(user_rated_movies_transposed$userId, rating_matrix_updated$userId), 
+                          match(names(user_rated_movies_transposed), names(rating_matrix_updated))] <- user_rated_movies_transposed
+    
+    
     # create empty vector for recommendations
     recommended_movies <- NULL
     
@@ -89,7 +114,9 @@ server <- function(input, output, session) {
     if(input$method == "NMF") {
       # create empty vector for new user (NMF does not accept NAs)
       new_user_ratings <- rep(0, ncol(rating_matrix))
-      new_user_ratings[user_rated_movies$movieId] <- user_rated_movies$rating
+      new_user_ratings[user_rated_movies$movieId] <- input_data
+      
+      print(length(new_user_ratings))
       
       # update rating matrix by attaching ratings by the user
       rating_matrix <- rbind(rating_matrix, new_user_ratings)
@@ -109,12 +136,19 @@ server <- function(input, output, session) {
       # predict movie ratings by the user
       new_user_predicted_ratings <- new_user_features %*% H 
       
+      print(length(new_user_predicted_ratings))
+      
       # Remove already-rated movies from recommendations
       rated_movie_indices <- which(!is.na(new_user_ratings))
-      # assign 0 value so these movies will be on the bottom of the sorted list(next step)
+      
+      print(length(rated_movie_indices))
+      
+      # assign 0 value so these movies will be on the bottom of list after sorting
       new_user_predicted_ratings[rated_movie_indices] <- 0
       
-      # select top5-rated movie ids as predicted
+      print(length(new_user_predicted_ratings))
+      
+      # select top 5-rated movie ids as predicted
       recommended_movie_ids <- order(new_user_predicted_ratings, decreasing = TRUE)[1:5]
       
       # retrieve movie title from reference table
