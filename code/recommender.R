@@ -16,7 +16,7 @@ ui <- fluidPage(
 )
 
 # server ----
-server <- function(input, output, session) {
+server <- function(input, output, session, sanitized_titles) {
     
   showRatingUI <- reactiveVal(FALSE)
     
@@ -34,21 +34,26 @@ server <- function(input, output, session) {
     if(showRatingUI()) {
       genre_selected <- input$genre
       # select the five most-popular movies from the user-selected genre 
-      popular_movies_to_rate <- movie_ref_table %>%
+      popular_movies <- movie_ref_table %>%
         # filter the respective genre-column based on input
         filter(.data[[genre_selected]] == 1) %>% 
         # sort based on ratings
         arrange(desc(rating)) %>%
         # extract top 10 movies
         head(10) %>%
-        pull(title)
-        
-      movie_rating_inputs <- lapply(popular_movies_to_rate, function(movie) {
-      # make movie titles HTML-conform by removing spaces
-        sanitized_movie_id <- gsub("[^a-zA-Z0-9]", "_", movie)
-        numericInput(sanitized_movie_id, label = movie, value = NA, min = 1.0, max = 5.0)
+        select(title, movieId)
+      
+      # remove special characters from titles  
+      sanitized_titles <- setNames(popular_movies$title, 
+                                   sapply(popular_movies$title, function(mov_title) gsub("[^a-zA-Z0-9]", "_", mov_title)))
+      
+      movie_rating_inputs <- lapply(names(sanitized_titles), function(san_title) {
+        # map sanitized movie title to original title
+        original_title <- sanitized_titles[[san_title]]
+        # input uses sanitized titles but GUI displays original titles
+        numericInput(san_title, label = original_title, value = NA, min = 1.0, max = 5.0)
       })
-        
+      
       do.call(tagList, movie_rating_inputs)
     }
   })
@@ -59,7 +64,10 @@ server <- function(input, output, session) {
     # store user input but exclude genre, recommendation method and buttons
     input_data <- sapply(names(input)[-c(11:14)], function(i) input[[i]])
     
-    print(input_data)
+    original_titles <- sanitized_titles[names(input_data)]
+    
+    print(original_titles)
+    print(str(original_titles))
     
     # retrieve the movies and 
     user_rated_movies <- movie_ref_table %>%
@@ -67,9 +75,11 @@ server <- function(input, output, session) {
       filter(.data[[genre_selected]] == 1) %>% 
       arrange(desc(rating)) %>% 
       head(10) %>% 
-      select(movieId, title) %>% 
-      # create rating column and fill with 0
-      mutate(rating = rep(0))
+      select(movieId, title)
+    
+    user_rated_movies$rating <- input_data[match(user_rated_movies$title, names(input_data))]
+      
+    print(user_rated_movies)
     
     user_rated_movies_transposed <- user_rated_movies %>%
       select(!title) %>% 
