@@ -1,4 +1,4 @@
-# user interface ----
+# Definne user interface ----
 ui <- fluidPage(
   # select a movie genre
   selectInput("genre", "Select a movie genre", choices = genre_list), 
@@ -16,14 +16,17 @@ ui <- fluidPage(
 )
 
 # server ----
-server <- function(input, output, session, sanitized_titles) {
+server <- function(input, output, session) {
     
   showRatingUI <- reactiveVal(FALSE)
     
   output$showRatingUI <- reactive({
     showRatingUI()
   })
-    
+  
+  # make sanitized_titles available outside the renderUI block
+  sanitized_titles <- reactiveVal()
+  
   observeEvent(input$submit_genre, {
     showRatingUI(TRUE)
   })
@@ -43,13 +46,15 @@ server <- function(input, output, session, sanitized_titles) {
         head(10) %>%
         select(title, movieId)
       
-      # remove special characters from titles  
-      sanitized_titles <- setNames(popular_movies$title, 
-                                   sapply(popular_movies$title, function(mov_title) gsub("[^a-zA-Z0-9]", "_", mov_title)))
       
-      movie_rating_inputs <- lapply(names(sanitized_titles), function(san_title) {
+      # remove special characters from titles
+      san_titles <- setNames(popular_movies$title, 
+                                   sapply(popular_movies$title, function(mov_title) gsub("[^a-zA-Z0-9]", "_", mov_title)))
+      sanitized_titles(san_titles)
+      
+      movie_rating_inputs <- lapply(names(san_titles), function(san_title) {
         # map sanitized movie title to original title
-        original_title <- sanitized_titles[[san_title]]
+        original_title <- san_titles[[san_title]]
         # input uses sanitized titles but GUI displays original titles
         numericInput(san_title, label = original_title, value = NA, min = 1.0, max = 5.0)
       })
@@ -57,14 +62,16 @@ server <- function(input, output, session, sanitized_titles) {
       do.call(tagList, movie_rating_inputs)
     }
   })
-  # generate recommendations after user prompt
+  # transforming user inputs----
   observeEvent(input$submit_recommendations, {
     
     genre_selected <- input$genre
-    # store user input but exclude genre, recommendation method and buttons
+    # extract movie titles and ratings from input
     input_data <- sapply(names(input)[-c(11:14)], function(i) input[[i]])
     
-    original_titles <- sanitized_titles[names(input_data)]
+    print(input_data)
+    
+    original_titles <- sanitized_titles()[names(input_data)]
     
     print(original_titles)
     print(str(original_titles))
