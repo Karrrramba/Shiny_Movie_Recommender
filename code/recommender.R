@@ -62,56 +62,45 @@ server <- function(input, output, session) {
       do.call(tagList, movie_rating_inputs)
     }
   })
-  # transforming user inputs----
+  # Extract user inputs and attach user-ratings to the rating matrix----
   observeEvent(input$submit_recommendations, {
     
     genre_selected <- input$genre
     # extract movie titles and ratings from input
     input_data <- sapply(names(input)[-c(11:14)], function(i) input[[i]])
     
-    print(input_data)
-    
     original_titles <- sanitized_titles()[names(input_data)]
     
-    print(original_titles)
-    print(str(original_titles))
+    # match original titles and ratings
+    og_titles_rated <- tibble(san_title = names(input_data),
+                              rating = as.numeric(input_data),
+                              og_title = unname(original_titles))
     
-    # retrieve the movies and 
+    og_titles_rated <- og_titles_rated%>%
+      select(-san_title) %>% 
+      mutate(rating = replace_na(rating, 0))
+    
+    
+    # 
     user_rated_movies <- movie_ref_table %>%
       # filter the respective genre-column based on input
       filter(.data[[genre_selected]] == 1) %>% 
       arrange(desc(rating)) %>% 
       head(10) %>% 
-      select(movieId, title)
-    
-    user_rated_movies$rating <- input_data[match(user_rated_movies$title, names(input_data))]
-      
-    print(user_rated_movies)
-    
-    user_rated_movies_transposed <- user_rated_movies %>%
+      select(movieId, title) %>% 
+      # attach ratings by matching titles
+      left_join(og_titles_rated, by = join_by(title == og_title)) %>% 
       select(!title) %>% 
+      # transpose
       pivot_wider(names_from = movieId, values_from = rating) %>% 
+      # create userId
       mutate(userId = 999)
     
-    # set default rating to 0
-    user_ratings <- tibble(title = user_rated_movies$title,
-                           rating = 0)
+    print("user_rated_movies")
+    print(user_rated_movies)
     
-    print(user_ratings)
-    
-    # update ratings according to user inputs
-    # create a logical mask indicating which of the popular movies the user has rated
-    user_rating_mask <- user_ratings$title %in% names(input_data)
-    # override default rating with user rating
-    user_ratings$rating[user_rating_mask] <- input_data
-    
-    # merge tables to attach movieID for recommender algorithms
-    user_ratings <- user_ratings %>% 
-      left_join(user_rated_movies, by = "title")
-    
-    print(user_ratings)
-    
-    # create named vector based on rating matrix with UserId 999
+    # Now we will create an empty vector, which we will populate with the user-given ratings and use to expand the rating matrix with.
+    # create empty vector with all movieIds (just like the rating matrix) and rating = 0 
     new_user_ratings <- setNames(c(999, rep(0, ncol(rating_matrix) -1)), names(rating_matrix))
     
     # attach new_user_ratings vector as new row to rating_matrix.
@@ -120,7 +109,6 @@ server <- function(input, output, session) {
     # for user-rated movieIDs replace 0s with user ratings
     rating_matrix_updated[match(user_rated_movies_transposed$userId, rating_matrix_updated$userId), 
                           match(names(user_rated_movies_transposed), names(rating_matrix_updated))] <- user_rated_movies_transposed
-    
     
     # create empty vector for recommendations
     recommended_movies <- NULL
